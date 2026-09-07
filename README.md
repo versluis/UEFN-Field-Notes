@@ -6,7 +6,7 @@ This is a living record, not a tutorial. It documents what actually happens when
 
 ## Who writes this
 
-These notes come out of active projects (currently *Sheep Petting Simulator* and a Fortnite museum experiment) built by a mixed human/agent team: a human developer and designer, a second human designer/playtester, a chat-based AI design partner, and an agentic AI implementer connected to the UEFN editor over MCP. Findings are verified in the editor, in the compiler, in the logs, or live in play — and marked accordingly (see the legend below).
+These notes come out of active projects (currently *Sheep Petting Simulator* and a Fortnite museum experiment) built by a mixed human/agent team: a human developer and designer (Jay), a second human designer/playtester (Julia), a chat-based AI design partner (Anthropic's Claude), and an agentic AI implementer (Claude Code) connected to the UEFN editor over MCP. Model versions change over time and are recorded in commit messages rather than here. Findings are verified in the editor, in the compiler, in the logs, or live in play — and marked accordingly (see the legend below).
 
 The working copy lives in a private Notion workspace; this repository is its regularly synced public mirror. Corrections and additions land upstream first and flow here at session close.
 
