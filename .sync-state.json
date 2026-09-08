@@ -1,5 +1,42 @@
 {
-  "_comment": "Sync state for the Notion -> GitHub mirror. Each entry records the Notion page this file was translated from and that page's last_edited_at at the time of the sync. Compare against Notion to find what has drifted since.",
+  "_what_this_is": [
+    "Sync state for the Notion -> GitHub mirror of the UEFN Field Notes.",
+    "Each entry records the Notion page a file was translated from, and that page's",
+    "last_edited_at as of the last sync. It exists so a future session with no memory",
+    "of earlier ones can tell genuine upstream drift from mere translation differences.",
+    "It is COMMITTED ON PURPOSE - do not add it to .gitignore. Ignored, it would live",
+    "only inside one ephemeral session container and help nobody after that session ends."
+  ],
+  "_how_to_sync": [
+    "1. Fetch the hub page and walk its whole subtree, including sub-pages of topic",
+    "   pages - new material has twice arrived as a child page, not an edit.",
+    "2. For each page, compare its last_edited_at against notion_last_edited_at below.",
+    "   Only the pages that moved need translating; leave the rest alone.",
+    "3. A page in the subtree with no entry here is unmirrored: it needs a new file.",
+    "4. Update every notion_last_edited_at you acted on, plus last_sync, in the same",
+    "   commit as the content. A manifest that lags the content is worse than none.",
+    "Direction is one way: Notion -> GitHub. If a repo file carries something Notion",
+    "lacks, flag it for the humans to copy upstream - never overwrite it away."
+  ],
+  "_translation_policy": [
+    "This repo is a public translation, not a copy. Epic and platform identifiers stay",
+    "verbatim (persona_component, aura_voice, /Irwin/AI/Base/Burt_Mammal_Invis, CVar",
+    "names, log lines). Project-owned identifiers are genericised: project and asset",
+    "names, persona names, machine and account names, personal names, internal build",
+    "and experiment codes. Keep the findings, the dates, the evidence types and the",
+    "struck-through corrections exactly as they are - the epistemics ARE the content.",
+    "Sub-pages are mirrored with a letter suffix on the parent's number (02a, 06a)."
+  ],
+  "_privacy_rule": [
+    "This file is public. What may live here: file names, Notion page IDs and URLs,",
+    "page titles, and timestamps. Page IDs and URLs are addresses, not credentials -",
+    "the workspace is private and Notion still requires auth, so a leaked ID grants",
+    "nobody anything. The titles are already public in the README structure table.",
+    "What must NEVER be cached here: page content or excerpts, titles of private pages",
+    "outside the mirrored hub, tokens, API keys, or personal data. If a future sync",
+    "wants content-level diffing, keep that cache OUT of the repo - the moment this",
+    "file holds content, it stops being safe to publish."
+  ],
   "notion_workspace": "Jay's Substack",
   "hub_page_id": "3d4f95ba-b9d3-8111-9f49-f35bd1d47c6e",
   "direction": "notion -> github (one way)",
