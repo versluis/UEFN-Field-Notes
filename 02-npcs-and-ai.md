@@ -7,6 +7,8 @@ last-reviewed-against: UEFN v42.10 (3 Sep 2026)
 
 The `npc_behavior` sandbox, animation presets, `Focus`, spawners, flocks, and the Irwin/Burt discovery. Dates on each entry. Project context: these findings come from a sheep-petting game ("the sheep" below), but the mechanisms are general.
 
+> 🗣️ **LLM personas live on their own page now** — see [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md). Split out 7 Sep 2026 because the findings grew substantial and are largely separate from `npc_behavior`, animation and spawner work.
+
 ## The npc_behavior Sandbox (the big one)
 
 - ⚠️ **CORRECTED 26 Aug 2026 — this entry was wrong as written.** The old claim was: *`npc_behavior` cannot reference level-placed devices via `@editable`.* **It compiles.** Adding `@editable MyButton : button_device = button_device{}` to an `npc_behavior` file on UEFN v42 built with zero errors and zero warnings. The declaration is legal.
@@ -102,3 +104,7 @@ The NPC walks forward → the preset plays `moveForward` → which contained the
 - ⭐ **Per-NPC association needs a manager — there is no way for NPCs to coordinate between themselves.** `FindCreativeObjectsWithTag` returns *every* tagged object, so N NPCs would all claim the same device. And **a device cannot be tagged at runtime**: only `entity` implements `has_tags`; `creative_object_interface` implements `positional` instead, so the "tag it as claimed" trick is impossible.
   - **Working pattern:** a `creative_device` manager holds `@editable []button_device`, hands them out one at a time, and counts. The NPC finds the manager by tag, casts to the custom class, and calls it. **The NPC keeps owning its own interaction; the manager only does what a lone NPC provably cannot — allocate and count.**
 - ⚠️ **Simultaneous claims — partially derisked, not closed.** Originally: one spawner staggers its batch ~3 s apart, so claims serialise with room to spare — spawn timing doing the work, not the code. *(Update, Sep 2026: a two-spawner test on the pooled-device architecture came back clean — ~300 ms interleave, no double-claims, no missed counts.)* ⚠️ **Still not fully closed:** 300 ms is ten times tighter than the single-spawner stagger and survived cleanly, but it is **not same-frame**. Two spawners firing in one tick, or `SpawnAt` placing a whole group at once, remains untested. **Observed clean at observed timings ≠ proven safe.**
+
+## 🗣️ LLM Personas — moved to their own file (7 Sep 2026)
+
+Epic's LLM persona system — `persona_component`, `ai_session`, the Persona Modifier, the Prompt Editor, voices, the 10,000-character prompt ceiling, and the recipe for an in-session spoken conversation — outgrew this page on the day it was written and now lives in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md).

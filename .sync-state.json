@@ -1,0 +1,75 @@
+{
+  "_comment": "Sync state for the Notion -> GitHub mirror. Each entry records the Notion page this file was translated from and that page's last_edited_at at the time of the sync. Compare against Notion to find what has drifted since.",
+  "notion_workspace": "Jay's Substack",
+  "hub_page_id": "3d4f95ba-b9d3-8111-9f49-f35bd1d47c6e",
+  "direction": "notion -> github (one way)",
+  "last_sync": "2026-09-08T04:30:00Z",
+  "files": [
+    {
+      "file": "00-version-watch.md",
+      "notion_page_id": "3d4f95ba-b9d3-8111-9f49-f35bd1d47c6e",
+      "notion_title": "UEFN Field Notes (hub body)",
+      "notion_last_edited_at": "2026-09-07T01:33:01Z"
+    },
+    {
+      "file": "01-verse-language-and-compiler.md",
+      "notion_page_id": "3d4f95ba-b9d3-81f3-8faf-c043f84b5e0e",
+      "notion_title": "Verse Language & Compiler",
+      "notion_last_edited_at": "2026-09-07T01:33:00Z"
+    },
+    {
+      "file": "02-npcs-and-ai.md",
+      "notion_page_id": "3d4f95ba-b9d3-811e-9b28-cea4c1b8a8f4",
+      "notion_title": "NPCs & AI",
+      "notion_last_edited_at": "2026-09-07T22:34:20Z"
+    },
+    {
+      "file": "02a-llm-personas-and-conversations.md",
+      "notion_page_id": "3d4f95ba-b9d3-8103-87b6-f1b6d2dd4cc8",
+      "notion_title": "LLM Personas & Conversations",
+      "notion_last_edited_at": "2026-09-08T04:28:17Z"
+    },
+    {
+      "file": "03-devices-and-interaction.md",
+      "notion_page_id": "3d4f95ba-b9d3-811e-9b18-ff54943bf4e7",
+      "notion_title": "Devices & Interaction",
+      "notion_last_edited_at": "2026-09-07T03:19:00Z"
+    },
+    {
+      "file": "04-scene-graph-and-prefabs.md",
+      "notion_page_id": "3d4f95ba-b9d3-81b4-9a4c-c17f7c209181",
+      "notion_title": "Scene Graph & Prefabs",
+      "notion_last_edited_at": "2026-09-07T03:49:00Z"
+    },
+    {
+      "file": "05-editor-and-tooling.md",
+      "notion_page_id": "3d4f95ba-b9d3-8106-84a9-fbad6f10f98c",
+      "notion_title": "Editor & Tooling",
+      "notion_last_edited_at": "2026-09-07T02:29:00Z"
+    },
+    {
+      "file": "06-lore-revision-control.md",
+      "notion_page_id": "3d4f95ba-b9d3-815a-9b21-e542600ff8e4",
+      "notion_title": "LORE (Revision Control)",
+      "notion_last_edited_at": "2026-09-07T02:29:00Z"
+    },
+    {
+      "file": "06a-lore-branching-and-merging.md",
+      "notion_page_id": "3d0f95ba-b9d3-81e8-b9e7-d203c3c79192",
+      "notion_title": "LORE Branching & Merging — Field Notes",
+      "notion_last_edited_at": "2026-09-07T02:34:04Z"
+    },
+    {
+      "file": "07-imports-and-validation.md",
+      "notion_page_id": "3d4f95ba-b9d3-812b-a033-e89bbd8a9b55",
+      "notion_title": "Imports & Validation",
+      "notion_last_edited_at": "2026-09-07T01:38:00Z"
+    },
+    {
+      "file": "08-trusting-ai-on-uefn.md",
+      "notion_page_id": "3d4f95ba-b9d3-814d-83a8-defa0df16d82",
+      "notion_title": "Trusting AI on UEFN",
+      "notion_last_edited_at": "2026-09-08T04:18:10Z"
+    }
+  ]
+}

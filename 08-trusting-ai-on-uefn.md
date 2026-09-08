@@ -37,5 +37,21 @@ Epic's own in-editor AI was consulted about a device-collision problem. Scored h
 - ⭐ **Confabulated rationale for its own error** — explaining *why* the invented feature is missing/hidden (strike four). **The most dangerous mode**: it reframes your correct observation as your mistake, and it survives a docs search because the docs for the *other product* exist. **Trust the menu in front of you over any explanation of why the menu is wrong.**
 - **Fictional UI path** — "Edit → Plugins", a menu UEFN does not have (strike six). Menus are the cheapest possible thing to verify: look.
 - **Impossible editor claims** — "runtime-spawned children configurable in the Details panel": a statement that cannot be true of entities that don't exist until simulation. Claims about *when* something exists are worth extra suspicion.
+- ⭐ **Stale doc comment closing a live route** (8 Sep 2026, and this one was ours, not Epic's assistant) — the inverse of the confabulated rationale. The AI reasons *correctly* from a real, quotable source that happens to be out of date, and declares a working route impossible. It survives a digest search because the digest *is* the source. The tell: the verdict "blocked" was never compiled. **If a compile can settle it, compile before writing it off.** Detail below.
 
-**Countermeasures that work:** grep the digest (`Verse.digest.verse`, `Assets.digest.verse`, `Fortnite.digest.verse`); read the toolset Python source and its `tests/` ([05-editor-and-tooling.md](05-editor-and-tooling.md)); `SearchCVars` before assuming an editor behaviour has no switch; walk the `:= class(parent)` inheritance chain before recording "X has no Y" (that one cost twice — see [03-devices-and-interaction.md](03-devices-and-interaction.md)).
+**Countermeasures that work:** grep the digest (`Verse.digest.verse`, `Assets.digest.verse`, `Fortnite.digest.verse`); read the toolset Python source and its `tests/` ([05-editor-and-tooling.md](05-editor-and-tooling.md)); `SearchCVars` before assuming an editor behaviour has no switch; walk the `:= class(parent)` inheritance chain before recording "X has no Y" (that one cost twice — see [03-devices-and-interaction.md](03-devices-and-interaction.md)); **and read Epic's documentation first** — see the entry below for what assuming there was none cost.
+
+## ⚠ Seventh entry, 7–8 Sep 2026 — the stale doc comment, and it was our own agent that fell for it
+
+Context: getting a player to *speak* to an LLM persona in a museum experiment (full account in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md)). The agent established **by measurement** that a voice channel is required and that nothing auto-creates one. Then it read `AddChatChannel`'s doc comment — *"fails if the `MaxSize` of the channel's `agent_group` is undefined"* — found `MaxSize` nowhere else in any digest, and recorded **"in-session conversation is BLOCKED on v42.10"** with a five-step argument. Steps 1–3 were measured and true. Step 4 was reasoned from the comment and never compiled.
+
+The human refused the conclusion — *"there has to be a solution"*. Retested: build the channel, register it, it works. The `MaxSize` sentence is simply stale. Working recipe found the same night; Epic's own docs turned out to ship the exact pattern on the *second* of two pages, while the *first* page — the one that had been read — says nothing about how a player talks to the NPC.
+
+**Why this is a distinct taxon.** Strikes one to six are inventions. This is the opposite: a faithful reading of a real source. That makes it *harder* to catch with the existing countermeasure — grepping the digest returns the wrong answer, confidently. The only thing that catches it is the empirical test the AI skipped because the source "already answered" the question.
+
+**Two rules earned:**
+
+1. **A doc comment is a claim, not evidence. If the route can be settled by a compile, compile it before writing "blocked."** Same rule as the `bEnablePersonaDevice` descriptor key: try the switch, don't infer from its name.
+2. **Read Epic's docs first, then verify against the digest.** Both humans and agent assumed there was no documentation worth checking. There was; it would have reached the result in a fraction of the time. The docs were also *wrong* in one sentence — so neither source is authoritative alone, and the docs are still the faster starting point.
+
+⭐ **Running score: six inventions by Epic's assistant, one over-faithful reading by ours. The human's stubbornness was the correction in both kinds.**

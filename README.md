@@ -49,12 +49,16 @@ Current engine baseline: **UEFN v42.10 / Unreal Engine 6.0** (September 2026).
 | `00-version-watch.md` | Dated version notices, per-update reviews, Epic roadmap watch |
 | `01-verse-language-and-compiler.md` | Effects, `no_rollback`, failable conjunctions, syntax traps, reading compiler output |
 | `02-npcs-and-ai.md` | The `npc_behavior` sandbox, animation presets, `Focus`, spawners, flocks, Epic's wildlife system |
+| `02a-llm-personas-and-conversations.md` | Epic's LLM persona system: `persona_component`, `ai_session`, voices, the 10,000-char prompt ceiling, the in-session conversation recipe, prompt craft |
 | `03-devices-and-interaction.md` | The runtime-device constraint, buttons on moving NPCs, tag discovery, pooling, HUD/map devices |
 | `04-scene-graph-and-prefabs.md` | Entities, the one-component rule, the working prefab recipe, what is closed and why |
 | `05-editor-and-tooling.md` | CVar search, the MCP toolsets and their Python source, agent skills, coordinate mapping |
 | `06-lore-revision-control.md` | Branches, three-way merges, file locking, binary conflicts, log forensics |
+| `06a-lore-branching-and-merging.md` | The forensics in full: three silent merge failures diagnosed from the logs, the personal-backup-branch model, conflict paths, the multi-user lock lifecycle |
 | `07-imports-and-validation.md` | Marketplace asset packs, the validation gate, publishing |
 | `08-trusting-ai-on-uefn.md` | Scored AI failure modes (including Epic's own assistant) and countermeasures |
+
+A **letter suffix** marks a sub-topic that outgrew its parent file and was split out: `02a` belongs to `02`, `06a` to `06`. The parent keeps the working rules and links down; the child carries the depth. Splitting this way keeps related files adjacent and never renumbers what already exists.
 
 ## For agents
 
@@ -74,4 +78,4 @@ MIT — see [LICENSE](LICENSE), chosen for maximum reuse including automated age
 
 ---
 
-*Maintained by the Sheep Petting Simulator team. The working copy lives in Notion; this mirror syncs at session close. Article-length write-ups drawing on these notes are linked from the relevant files as they are published. The deep-dive LORE branching/merging forensics write-up lands as a follow-up commit.*
+*Maintained by the Sheep Petting Simulator team. The working copy lives in Notion; this mirror syncs at session close. Article-length write-ups drawing on these notes are linked from the relevant files as they are published.*

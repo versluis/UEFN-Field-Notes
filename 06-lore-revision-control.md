@@ -5,7 +5,7 @@ last-reviewed-against: UEFN v42.10 (3 Sep 2026)
 
 # LORE (Revision Control)
 
-Branches, merging, file locking, logs, and working rules for Epic's built-in, server-hosted revision control. LORE was named **Unreal Revision Control (URC)** before v42 — older docs and forum threads use that name. Much of this is undocumented by Epic and was established by testing on a deliberately throwaway project; a deep-dive forensics write-up (the three silent merge failures, the log archaeology, the multi-user lock lifecycle) follows in this repo as a later commit.
+Branches, merging, file locking, logs, and working rules for Epic's built-in, server-hosted revision control. LORE was named **Unreal Revision Control (URC)** before v42 — older docs and forum threads use that name. Much of this is undocumented by Epic and was established by testing on a deliberately throwaway project; the deep-dive forensics write-up — the three silent merge failures, the log archaeology, the conflict paths and the multi-user lock lifecycle — is in [06a-lore-branching-and-merging.md](06a-lore-branching-and-merging.md).
 
 ## Basics & working rules
 
