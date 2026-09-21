@@ -40,13 +40,13 @@
   "notion_workspace": "Jay's Substack",
   "hub_page_id": "3d4f95ba-b9d3-8111-9f49-f35bd1d47c6e",
   "direction": "notion -> github (one way)",
-  "last_sync": "2026-09-21T01:30:00Z",
+  "last_sync": "2026-09-21T04:50:00Z",
   "files": [
     {
       "file": "00-version-watch.md",
       "notion_page_id": "3d4f95ba-b9d3-8111-9f49-f35bd1d47c6e",
       "notion_title": "UEFN Field Notes (hub body)",
-      "notion_last_edited_at": "2026-09-20T02:53:19Z"
+      "notion_last_edited_at": "2026-09-21T04:48:00Z"
     },
     {
       "file": "01-verse-language-and-compiler.md",
@@ -82,7 +82,7 @@
       "file": "05-editor-and-tooling.md",
       "notion_page_id": "3d4f95ba-b9d3-8106-84a9-fbad6f10f98c",
       "notion_title": "Editor & Tooling",
-      "notion_last_edited_at": "2026-09-20T04:14:39Z"
+      "notion_last_edited_at": "2026-09-21T04:47:00Z"
     },
     {
       "file": "06-lore-revision-control.md",
