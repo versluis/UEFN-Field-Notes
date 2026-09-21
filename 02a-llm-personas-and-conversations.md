@@ -538,3 +538,63 @@ Three v42.10 capabilities are described in documentation but absent from the bui
 - **Pinned facts** is a doc claim that **wrongly opens a route that does not exist** — a false positive that would have cost the next one.
 
 ⭐ **"Unproven until it compiles" covers both**, which is the reason to prefer it over "trust the docs" or "distrust the docs". Apply it to Epic's documentation exactly as [08-trusting-ai-on-uefn.md](08-trusting-ai-on-uefn.md) applies it to AI-suggested APIs.
+
+## ✅ Structured output drives gameplay — the door works (9 Sep 2026)
+
+`RegisterAction` → structured verdict → `barrier_device.AddToIgnoreList` → that visitor walks through. Confirmed live: demonstrate understanding of Chapter 7 to the Chapter 7 guide and the door opens; a different era's guide, asked the same question, correctly declines and the door stays shut.
+
+⭐ **`RegisterAction` DOES fire during ordinary voice conversation.** No `Prompt` call is needed to "activate" it — the model emits the struct alongside its spoken replies.
+
+### ⚠️ The logging trap that cost an hour — log BOTH outcomes
+
+The verdict callback originally logged only the `true` case:
+
+```verse
+OnVerdict(Verdict):
+    if (Verdict.visitorUnderstandsChapter7?):
+        …log and unlock…
+    # no else branch
+```
+
+A healthy stream of `false` judgements therefore produced **zero log lines**, which was read as *"the action never fired"* — leading to a confident but wrong conclusion that `RegisterAction` does not participate in voice conversation, and to building an entire replacement mechanism for a problem that did not exist.
+
+⭐ **Rule: any boolean judgement must log both branches.** Silence is not evidence of absence; it is evidence of a missing `else`. Same failure shape as the `MaxSize` episode — concluding from absence of evidence — arrived at from the opposite direction.
+
+### ⛔ Out-of-band `ai_session.Prompt` is MODERATED — this revises the "Channel A" note above
+
+The replacement mechanism was a `Prompt` call after each reply, asking for the verdict out of band, phrased as stage direction:
+
+> *"INTERNAL ASSESSMENT ONLY — this is not the visitor speaking, and you must not reply to it or mention it…"*
+
+**Result: 11 of 14 calls returned `The response has been Moderated`** (one `Unknown Error`, two succeeded). Worse, **the canned refusal surfaced on the player's screen** as a brief *"I won't do that"* banner mid-session.
+
+⭐ **Why: a prompt instructing the persona to disregard the conversation frame and not reply reads as prompt injection — exactly what Epic's moderation exists to catch.** The phrasing intended to keep the assessment invisible is the phrasing most likely to be rejected.
+
+⚠️ **This materially revises the runtime-context design recorded above.** `Prompt` was filed as "viable but not silent — costs a turn, enters compacted history, may leak into spoken replies." Add to that: **it is likely to be moderated outright if phrased as an aside, and its failures are visible to the player.** For anything the player should not see, `RegisterAction` is not merely cleaner — **it is the only channel that works.**
+
+### The working shape
+
+```verse
+Persona.GetAISession().RegisterAction(
+    prompt_binding_definition{ Name := …, Description := … },
+    true,                          # Required - judge on every response
+    understood_era,                # the exported struct
+    OnVerdict)                     # callback: struct only, NO agent
+```
+
+- ⚠️ **The callback receives no agent.** Pair it with `StartHearEvent`, which does, and treat the most recent speaker as the subject.
+- `Required := true` gives a verdict every response, which is what a continuous judgement wants.
+- Guard with an `[agent]logic` map so each visitor is unlocked once, not on every subsequent reply.
+
+⭐ **`barrier_device.AddToIgnoreList` unlocks per visitor**, so two people can be at different stages of the same exhibit without blocking each other — better suited to an open space than a literal door.
+
+### 🔍 Open: the persona UI shows "unavailable" from spawn
+
+At spawn the talk UI renders with a guide's name and the state **"unavailable"**, before the player has approached anyone. It resolves on first approach and behaves correctly thereafter.
+
+**Eliminated by testing:**
+
+- ❌ *No conversation target set* — calling `ClearConversationTarget()` at join to establish a cleared state made no difference.
+- ❌ *`hearingRange` too generous* — reducing it from 3000 to 900 on both personas made no difference.
+
+**Remaining hypothesis: plain channel membership.** The player is added to every persona's `voice_channel` at join regardless of distance, and "unavailable" is simply the UI state for *in a persona's channel with no active conversation*. Fix to try: move `AddChatChannel` out of the join step into the proximity gate, paired with `RemoveChatChannel` on departure — with care, since asymmetric add/remove is what caused the 216-channel leak.

@@ -40,7 +40,7 @@ UEFN moves fast and findings expire. Two conventions keep the notes honest:
 1. **Every finding is stamped with the version it was observed on.** Old-version knowledge is never deleted — it remains valid *for that version*, and has repeatedly proven useful after regressions and when comparing behaviour across updates.
 2. **Every file carries a `last reviewed against` line in its front matter.** This records the most recent engine version someone has read the file against. "Proven on v41.10, reviewed against v42.10, still stands" and "proven on v41.10, never re-checked" are different claims, and the front matter is what distinguishes them. An "engine-blocked" note is a claim with an expiry date — one of this project's costliest lessons was leaving one unre-tested across an engine jump.
 
-Current engine baseline: **UEFN v42.10 / Unreal Engine 6.0** (September 2026).
+Current engine baseline: **UEFN v42.20 / Unreal Engine 6.0** (September 2026).
 
 ## Structure
 
@@ -57,6 +57,7 @@ Current engine baseline: **UEFN v42.10 / Unreal Engine 6.0** (September 2026).
 | `06a-lore-branching-and-merging.md` | The forensics in full: three silent merge failures diagnosed from the logs, the personal-backup-branch model, conflict paths, the multi-user lock lifecycle |
 | `07-imports-and-validation.md` | Marketplace asset packs, the validation gate, publishing |
 | `08-trusting-ai-on-uefn.md` | Scored AI failure modes (including Epic's own assistant) and countermeasures |
+| `09-custom-uis.md` | Verse-authored widgets and UMG Widget Blueprints: live setters vs rebuild, MVVM bindings, module declaration, per-player instances |
 
 A **letter suffix** marks a sub-topic that outgrew its parent file and was split out: `02a` belongs to `02`, `06a` to `06`. The parent keeps the working rules and links down; the child carries the depth. Splitting this way keeps related files adjacent and never renumbers what already exists.
 

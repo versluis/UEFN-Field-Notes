@@ -38,6 +38,7 @@ Epic's own in-editor AI was consulted about a device-collision problem. Scored h
 - **Fictional UI path** — "Edit → Plugins", a menu UEFN does not have (strike six). Menus are the cheapest possible thing to verify: look.
 - **Impossible editor claims** — "runtime-spawned children configurable in the Details panel": a statement that cannot be true of entities that don't exist until simulation. Claims about *when* something exists are worth extra suspicion.
 - ⭐ **Stale doc comment closing a live route** (8 Sep 2026, and this one was ours, not Epic's assistant) — the inverse of the confabulated rationale. The AI reasons *correctly* from a real, quotable source that happens to be out of date, and declares a working route impossible. It survives a digest search because the digest *is* the source. The tell: the verdict "blocked" was never compiled. **If a compile can settle it, compile before writing it off.** Detail below.
+- ⭐ **Denied capability — the false negative** (20 Sep 2026, and the most expensive shape yet): asserting that a real, shipping feature *does not exist*. ⚠️ **It never fails loudly.** An invented API won't compile and you learn in seconds; a denied capability sends you off to build a laborious workaround that **compiles, runs and ships** — so nothing ever tells you it was wrong. **The tell: you are being told to do something effortful to achieve something ordinary.** Detail below.
 
 **Countermeasures that work:** grep the digest (`Verse.digest.verse`, `Assets.digest.verse`, `Fortnite.digest.verse`); read the toolset Python source and its `tests/` ([05-editor-and-tooling.md](05-editor-and-tooling.md)); `SearchCVars` before assuming an editor behaviour has no switch; walk the `:= class(parent)` inheritance chain before recording "X has no Y" (that one cost twice — see [03-devices-and-interaction.md](03-devices-and-interaction.md)); **and read Epic's documentation first** — see the entry below for what assuming there was none cost.
 
@@ -55,3 +56,45 @@ The human refused the conclusion — *"there has to be a solution"*. Retested: b
 2. **Read Epic's docs first, then verify against the digest.** Both humans and agent assumed there was no documentation worth checking. There was; it would have reached the result in a fraction of the time. The docs were also *wrong* in one sentence — so neither source is authoritative alone, and the docs are still the faster starting point.
 
 ⭐ **Running score: six inventions by Epic's assistant, one over-faithful reading by ours. The human's stubbornness was the correction in both kinds.**
+
+
+## ⚠ Eighth entry, 14 Sep 2026 — a mechanism fitted to one data point (ours)
+
+Question: *why does the creature spawner's elimination log stop after 2 kills?* The agent read the Verse (correct), the spawner's settings from its actor file (correct), and **the most recent round** of the log (2 events, then silence). It assembled a clean story from real, documented settings — *self-damage on spawn + a lifetime spawn limit + an invisible spawner = the device quietly destroys itself and its event dies with it* — and presented it as the likely cause. The setting was turned off. **Zero events.**
+
+Re-reading the **whole day's** log instead of the last round settled it in one grep: four zero-event rounds had happened *before* the setting was ever touched. The event was never reliable, and a controlled test proved it (see [02-npcs-and-ai.md](02-npcs-and-ai.md)).
+
+**Why this is a distinct taxon.** No invention — every setting was real and every docs quote accurate — and no stale source. The failure was **sampling**: a coherent mechanism fitted to the one observation that happened to be nearest, when the history that would have falsified it sat in the same file. It also *explained the specific number* (2), which made it feel more confirmed than it was. **A story that fits the detail is not the same as a story that survives the other rounds.**
+
+**Rules earned:**
+
+1. **Before explaining a symptom, check how consistently it happens.** "Stops after 2" was really "0–2, varying" — a different bug.
+2. **Prefer the instrumented run to the theory.** Logging both routes side by side in one round answered in a single playtest what settings-reading could not.
+
+⭐ **Running score: six inventions by Epic's assistant, two failures by ours — one over-faithful reading, one under-sampled one. Both caught by testing, not by reasoning harder.**
+
+## ⚠ Ninth entry, 20 Sep 2026 — Epic's assistant DENIED two real features
+
+Beginning Verse UI work from a snippet Epic's in-editor assistant produced, and asked about updating a score on screen, it maintained — repeatedly — that:
+
+- ❌ *"everything is immutable and we cannot edit any values on any widget once they're created"*
+- ❌ *"widget bindings don't exist in UEFN"*
+
+**Both false, and both disproven the same day by building the thing.**
+
+- ✅ **`text_base` (`/UnrealEngine.com/Temporary/UI`), which `text_block` inherits from, declares `SetText`, `SetTextColor`, `SetTextSize`, `SetTextOpacity`** and their getters. A `text_block` already on screen updates **in place**. ⭐ **What *is* immutable is `DefaultText`**, documented in the digest as *"Used only during initialization of the widget and not modified by SetText"* — **a real constraint on one family of fields, generalised into a false constraint on everything.** The seed of truth is what makes it persuasive.
+- ✅ **MVVM widget bindings not only exist, they are how Epic's own `UserInterfaces_Demo` sample is built.** There is a **View Bindings** panel in the widget editor, Verse fields on Epic's own widgets, and **two entire MCP toolsets** dedicated to authoring them (`MVVMToolset`, `VerseFieldsToolset`). This is not an obscure corner — it is the headline feature of the sample project shipped to teach UEFN UI.
+
+**The workaround it taught:** tear the widget down and rebuild it from scratch on every update. ⚠️ **That code WORKS.** It shipped and behaved correctly on screen. It is simply several times the work, rebuilds an entire widget tree per value change, and installs a wrong model of the platform in the reader's head.
+
+**Why this is a distinct taxon, and the worst one for cost.** Strikes one to six **invent** things — the code doesn't compile and you find out in seconds. The seventh (ours) was a faithful reading of a **stale** source. This one **denies a real capability**, and the resulting workaround compiles, runs, and passes playtest. **There is no failure signal at any point.** You ship it, it works, and you never look again — the error propagates into every UI you build afterwards.
+
+**Rule earned:**
+
+⭐ **When an assistant says the platform CAN'T do something ordinary, disbelieve it harder than when it says it can.** A hallucinated API is self-correcting; the compiler is the countermeasure and it fires immediately. A denied capability is **self-confirming** — the workaround's success reads as evidence the denial was right.
+
+- **The tell: being told to do something laborious to achieve something routine.** "Rebuild the whole widget to change one number" should have read as an alarm, not as an answer.
+- **The countermeasure: grep the digest for the thing you would EXPECT to exist** — search `SetText`, not "can widgets be updated". Then **walk the `:= class(parent)` chain**, because `text_block` is `class<final>(text_base)` and every setter lives on the parent. *(The same inheritance-chain rule that already cost twice on `button_device` — see [03-devices-and-interaction.md](03-devices-and-interaction.md).)*
+- Full working recipes for both paths are in [09-custom-uis.md](09-custom-uis.md).
+
+⭐ **Running score: nine failures logged — seven by Epic's assistant (six inventions, one denial) and two by ours (one over-faithful reading, one under-sampled). Every single one was caught by building the thing, never by reasoning harder about it.**

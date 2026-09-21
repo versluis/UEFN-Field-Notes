@@ -105,6 +105,123 @@ The NPC walks forward → the preset plays `moveForward` → which contained the
   - **Working pattern:** a `creative_device` manager holds `@editable []button_device`, hands them out one at a time, and counts. The NPC finds the manager by tag, casts to the custom class, and calls it. **The NPC keeps owning its own interaction; the manager only does what a lone NPC provably cannot — allocate and count.**
 - ⚠️ **Simultaneous claims — partially derisked, not closed.** Originally: one spawner staggers its batch ~3 s apart, so claims serialise with room to spare — spawn timing doing the work, not the code. *(Update, Sep 2026: a two-spawner test on the pooled-device architecture came back clean — ~300 ms interleave, no double-claims, no missed counts.)* ⚠️ **Still not fully closed:** 300 ms is ten times tighter than the single-spawner stagger and survived cleanly, but it is **not same-frame**. Two spawners firing in one tick, or `SpawnAt` placing a whole group at once, remains untested. **Observed clean at observed timings ≠ proven safe.**
 
+## 🧟 Creature spawners — counting what actually died (14–16 Sep 2026, v42.10)
+
+*Findings from a wave-survival project: one `creature_spawner_device` (Fiends), one Verse controller device.*
+
+### ⛔ `creature_spawner_device.EliminatedEvent` is UNRELIABLE — subscribe per creature instead
+
+**Symptom:** subscribed once in `OnBegin`, printed on every elimination, killed all 4 creatures — the log recorded 0, 1 or 2 events per round, never 4. Code, wiring and push were all fine; no Verse runtime errors.
+
+**Evidence, from the editor log across eight rounds in one day:**
+
+| Round start | Events logged |
+|---|---|
+| 15:26 | 1 (6 s in) |
+| 15:29, 15:40, 15:43, 15:44 | 0 |
+| 15:55 | 2 (7 s and 8 s in, 1.3 s apart) |
+| 16:29, 16:31 (after a settings change) | 0 |
+
+✅ **Controlled test: both routes in the same round, same four kills.** The spawner's `EliminatedEvent` fired **once** (first kill, `Source` set) and never again. Each creature's own `fort_character.EliminatedEvent()` fired **4 of 4**.
+
+**The working recipe:**
+
+```verse
+using { /Fortnite.com/Devices }
+using { /Fortnite.com/Characters }   # fort_character, GetFortCharacter
+using { /Fortnite.com/Game }         # elimination_result - NOT in Characters
+
+OnBegin<override>()<suspends>:void=
+    Sleep(0.0)
+    CreatureSpawner.SpawnedEvent.Subscribe(OnCreatureSpawned)
+
+OnCreatureSpawned(Creature : agent) : void =
+    if (Character := Creature.GetFortCharacter[]):
+        Character.EliminatedEvent().Subscribe(OnCreatureEliminated)
+
+OnCreatureEliminated(Result : elimination_result) : void =
+    set PlayerScore += 1
+```
+
+`SpawnedEvent` itself was reliable: 4 spawns logged within ~2 s of round start.
+
+⚠️ **ADDENDUM, same evening — "unreliable" is probably too broad.** With **Limit Spawned Creatures switched Off** (`GetSpawnLimit()` returning **0**) and Verse toggling the spawner with `Disable()`/`Enable()` for waves, the spawner's `EliminatedEvent` fired **40 of 40**, exactly matching the per-character count. Every failing round above had the limit **On**. **Hypothesis, not proven:** the spawner stops reporting eliminations once its lifetime spawn limit has been reached. Two variables changed at once, so settle it with one A/B round: limit On vs Off, nothing else. **Until then the per-character recipe stays the safe default** — it worked in both configurations.
+
+### ⭐ Despawns look like KILLS — and a player check is what separates them
+
+⚠️ **A despawned creature fires the same elimination events a killed one does**, and counts toward score and wave progress. Symptom: walking away from the creatures scores points and clears waves. Two clusters of near-simultaneous eliminations (2 creatures 48 ms apart, 3 within 44 ms) with no other elimination pair under 0.25 s in 70 — the signature of a despawn batch, not player kills.
+
+- ❌ **`elimination_result.EliminatingCharacter` is NOT false on a despawn.** An `if (Result.EliminatingCharacter?) … else: Print("despawned")` handler printed **zero** "despawned" lines across two rounds while seven despawn clusters all took the kill branch. **A despawn carries a killer.**
+- ✅ **SOLVED: the despawn "killer" is not a PLAYER.** Two despawn clusters took the `else` branch of a player check and printed correctly; every real kill took the player branch; score rose only on kills.
+- ⚠️ **The spawner's own `EliminatedEvent` reported "killed by an agent" for all six despawned creatures too**, so **`Source?` succeeding proves nothing** — check for a player there as well.
+
+**⭐ Working recipe — kills vs despawns, with "breather areas" (walking out of range pauses the pressure without skipping the wave):**
+
+```verse
+OnCreatureEliminated(Result : elimination_result) : void =
+    # despawns report a killer too, so only count kills made by a player
+    if (Killer := Result.EliminatingCharacter?, KillerAgent := Killer.GetAgent[], player[KillerAgent]):
+        set Eliminated += 1        # + score
+        if (Eliminated >= WaveSize, Eliminated >= Spawned):
+            WaveCleared.Signal()
+    else:
+        # despawned: un-count it and let the spawner replace it on return
+        set Spawned -= 1
+        CreatureSpawner.Enable()
+```
+
+**Proven live:** a wave's three creatures despawned; the spawner re-spawned three when the player came back into Activation Range 25 s later; those three were killed and the wave cleared normally.
+
+**Alternative if breather areas are not wanted:** *Despawn Type → Do Not Despawn* — simpler, no code, but it loses the breather and the recovery path for a creature stuck somewhere unreachable.
+
+### ⚠️ The per-creature subscription can silently MISS a creature — and that soft-locks a wave (16 Sep 2026)
+
+Symptom: *"the creatures stopped coming after wave 3."* The log showed wave 3 spawn 5 creatures, then **two clusters of 3 spawner-side eliminations with no per-character prints at all**, then silence. Round totals: **14 spawns, 14 spawner events, but only 11 per-character events** — 3 creatures were never counted. With the spawner already disabled and the wave waiting on creatures it can never see die, **nothing more happens, forever.**
+
+⭐ **The detector is the mismatch.** Keeping the spawner's own `EliminatedEvent` subscribed purely as a comparison print is what made this visible. Worth keeping in any counter built on per-character events.
+
+**Suspected cause:** `Creature.GetFortCharacter[]` fails at `SpawnedEvent` time (the character isn't ready yet), so the `if` simply doesn't subscribe and the creature is never watched. **Fix (compile-verified, playtest pending):** retry briefly in a spawned task, warn if it never resolves, and add a wave timeout so a miss can never stall the game:
+
+```verse
+WatchCreature(Creature : agent)<suspends> : void =
+    for (Attempt := 0..20):
+        if (Character := Creature.GetFortCharacter[]):
+            Character.EliminatedEvent().Subscribe(OnCreatureEliminated)
+            return
+        Sleep(0.1)
+    Print("WARNING: no fort_character after 2s - this creature will never be counted")
+
+OnCreatureSpawned(Creature : agent) : void =
+    set Spawned += 1
+    spawn { WatchCreature(Creature) }   # OnCreatureSpawned is not <suspends>, so spawn it
+```
+
+```verse
+race:                                  # in the wave loop, instead of a bare Await
+    WaveCleared.Await()
+    block:
+        Sleep(WaveTimeout)
+        Print("Wave {WaveSize} timed out - moving on")
+```
+
+### ❌ ~~A creature can report its elimination TWICE~~ — WRONG, and the correction is the lesson
+
+~~Counted per round by timestamp adjacency, every "despawn" in two rounds arrived <0.25 s after a kill — a second event for a creature that had just been killed.~~ **WRONG — corrected the same evening by reading the file's block structure. It was our bug, not the platform's.**
+
+A new method had been pasted **between the `if` and the `else`** of the elimination handler, so that `else` bound to the `if` *inside the pasted method*. Every kill that didn't clear the wave therefore ran the despawn branch: printed "despawned", decremented the spawned count and re-enabled the spawners — which is why kills spawned more enemies than there was ammo for. Real despawns, meanwhile, did nothing at all, because the handler no longer had an `else` of its own.
+
+⭐ **The lesson: this compiled cleanly and the counts "only" drifted.** Verse will happily attach an `else` to whatever `if` precedes it at that indentation, including one inside a method inserted mid-function. **When counters misbehave, read the block structure before theorising about the platform.** *(The timestamp-adjacency table stands as a detection method; the cause was ours. No de-duplication code was needed.)*
+
+### Creature Spawner options worth knowing
+
+- **Damage Spawner After Spawn defaults On** — the spawner damages itself on every spawn. What happens at zero health, or at the spawn limit, is **undocumented and unverified**. ✅ It did *not* destroy the spawner over 70+ spawns in one round — but *Invincible Spawner* was also On, so whether invincibility covers self-damage, or self-damage simply never kills it, is **not separated**.
+- **Limit Spawned Creatures** default Off; **Total Spawn Limit** (visible only when that is On) default **1**, a lifetime cap. **Number of Creatures** = concurrent cap, default 4. **Despawn Type** default *Distance To Enemy*, **Despawn Range** default 9 tiles.
+- ⛔ **`creature_spawner_device.SpawnAt(Position)` returned false every time — even with the spawner enabled (16 Sep 2026).** Tried at the spawner's own position with `Enable()` called immediately before. The digest says it returns false *"if the device has reached its maximum spawn count"*, which was not the case. Untested variants: a delay after `Enable()`, and a position near a player rather than at the spawner. ✅ **What works instead:** `Enable()` the spawner and count its `SpawnedEvent`, exactly like the normal ones — set **Number of Creatures to the number wanted** and disable it again once that many have spawned. Costs batch precision, but it spawns.
+- ⚠️ **`Disable()` does not stop a spawn batch already in flight.** Wave size 1: the first `SpawnedEvent` triggered `Disable()`, and **two more creatures spawned 0.08 s and 0.32 s later** — the device's *Number of Creatures* was 3, so it released a batch of 3. **Wave logic must not assume the spawner produces exactly the number it was allowed** — count what actually spawned.
+- ⚠️ **Overlapping `spawn{}` wave timers — a Verse logic trap, not a device bug.** Triggering `spawn { NextWave() }` from an elimination callback whenever a counter reached the wave size fired it **three times in 2.3 s** (the overshoot creatures each completed the "wave" again), jumping the wave size and desynchronising the counters for the rest of the round. **Fix:** one `loop` owns the wave timeline and `Await`s a custom `event()` signalled when the wave is cleared.
+- ❓ **Whether `npc_spawner_device.EliminatedEvent` shares the fault is untested** — it is listed above as the spawner-side despawn event. Verify against a per-character subscription before counting on it.
+- *Creature Manager* device exposes `MatchingCreatureTypeEliminatedEvent` — an unverified alternative for counting across spawners.
+
 ## 🗣️ LLM Personas — moved to their own file (7 Sep 2026)
 
 Epic's LLM persona system — `persona_component`, `ai_session`, the Persona Modifier, the Prompt Editor, voices, the 10,000-character prompt ceiling, and the recipe for an in-session spoken conversation — outgrew this page on the day it was written and now lives in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md).

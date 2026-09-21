@@ -46,3 +46,39 @@ The runtime-device constraint, button behaviour, tag discovery, pooling rational
 
 - ✅ **`tracker_device` is the native quest HUD** — "description N/target" in the corner, no custom UI. `AssignToAll()`, `Increment(Agent)`, `IncreaseTargetValue(Agent)`, `CompleteEvent`. Needs the *agent who acted* — note `button_device.InteractedWithEvent` sends it.
 - ✅ **`map_indicator_device`** marks the map, inherits `TeleportTo` (rides the follow pattern fine), `Enable`/`Disable`, plus **`ActivateObjectivePulse(Agent)`** — a native per-player trail pointing toward the device. **Display cleanup:** the device defaults to two "A" icons — a world-space icon and a map icon. **Set both default icons to None** to leave just the clean red minimap dot; an optional text label also exists.
+
+## ⭐ `teleporter_device` — and the three different meanings of "off" (7 Sep 2026)
+
+**`Teleport(Agent)` pulls an agent TO the device.** So a teleporter used purely as an *arrival point* needs no linking, no groups, no partner — place it where players should land and call it. It is **per-agent**, so co-op is just a loop over `GetPlayspace().GetPlayers()`. (`Activate(Agent)` is the other direction — sends the agent to *its* target group.)
+
+### ✅ The recipe for a destination-only teleporter
+
+1. **Teleporter Target Group → None.** With nowhere to send anyone, walking in does nothing — while `Teleport(Agent)` still delivers players to it. **This is the working answer.**
+2. **Teleporter Rift Visible → unchecked.** Cosmetic tidy-up, safe *once step 1 is done*.
+
+### ⚠️ Two approaches that FAIL, both tested — and they map three distinct meanings of "off"
+
+| Approach | Effect | Verdict |
+|---|---|---|
+| `Disable()` in Verse | Kills the **whole device**, destination included — `Teleport(Agent)` silently stops working | ⛔ Too blunt |
+| "Rift Visible" unchecked, alone | **Cosmetic only.** The device is still walk-in-able — a tester wandered into one they could not see and was teleported | ⛔ *Worse* than visible: an invisible trap |
+| `OverlapCapsule.bGenerateOverlapEvents = false` | The 22 cm entry capsule stops reporting overlaps — **and entry still worked** | ⛔ Not the entry path |
+
+⭐ **The lesson, which generalises past teleporters:** *"off"* is not one thing on a UEFN device. **Disabled** (dead to everything, Verse included), **invisible** (purely cosmetic), and **deaf to overlap** (component-level) are three separate axes — and on this device *none* of them is the one that stops a player using it. **The functional switch was a user option in the Details panel, not an API call or a component flag.** Check the Details panel's own options before reaching for Verse or component surgery.
+
+*Method note: the failed capsule experiment was reverted (`bGenerateOverlapEvents` back to `true`) rather than left in place — a setting that changes nothing is worse than no setting, because the next person has to work out why it is there.*
+
+## 🖥️ UI: HUD devices vs Verse-authored widgets (16 Sep 2026)
+
+Three ways of putting information on screen, auditioned in one build, keeping the best of each.
+
+- ⛔ **`tracker_device` (the blue quest box) IGNORES Verse `Increment` unless Stat to Track is None.** Placed fresh, the device defaults to **`statToTrack` = "Eliminations"**, which counts player-vs-player kills only. Symptom: the box sits at 0 forever while `Increment(Agent)` is called on every creature kill; `IncreaseTargetValue` still works, so the target climbs and the progress never does. **Fix: `statToTrack` = "None"**, then Verse drives the value entirely.
+- **Useful tracker settings** (all writable over MCP with `ObjectTools.set_properties`): `showProgress` = **Remaining** counts *down* ("3 remaining") instead of up; `trackerCompletionCeremony` = false kills the fanfare; `whenTargetIsReached` = "Do Nothing" stops a completed tracker ending the round; `trackerTitle` / `descriptionText` are the two lines of HUD text; `sharing` = Individual / Team / All.
+- ⚠️ **A completed tracker stops counting and shows a green tick, and `Reset` does not re-arm it** — neither did `RemoveFromAll()` + `AssignToAll()`. Counting *down* via Remaining sidesteps it, because reaching 0 left is the wanted end state anyway.
+- **`hud_message_device` has no size control** — only `Show(Message, ?DisplayTime)` and `SetText`. For a big centre-screen announcement, a Verse `text_block` at `DefaultTextSize := 140.0` is ~5× what the device shows, and `SetVisibility(widget_visibility.Collapsed)` after a `Sleep` hides it again. Run it in a `spawn{}` so the surrounding loop isn't delayed.
+- ⚠️ **Verse widget positioning is fussier than it looks.** The same `text_block`, in the same canvas as a banner that rendered perfectly, was **invisible** at `X := 0.5, Y := 0.04` (behind Fortnite's own top-centre compass) *and* at `X := 0.96, Y := 0.10, Alignment := (1.0, 0.5)`. Giving it the identical slot shape to the working banner (centred, `Alignment := (0.5, 0.5)`) made it appear immediately. **Debugging order that worked:** a `Print` in the build function to prove the widget is created at all, `DefaultText` at construction so it never depends on a later refresh, then copy a slot that already renders.
+- **Don't forget the refresh calls:** a score that only updates in one handler shows a stale number everywhere else.
+- ⭐ **`map_indicator_device`: disabling it does NOT clear the objective pulse.** The on-screen arrow keeps pointing at a finished objective until `DeactivateObjectivePulse(Agent)` is called **per player**; `Disable()` alone only removes the map icon. Symptom: *"I collected all the loot and the arrow still pointed at the empty location."*
+- ⭐ **Map indicators can be told apart by colour and label:** `text`, `iconColor` and `textColor` are all writable over MCP as LinearColor `{r,g,b,a}` — so different objective types can read differently at a glance. `glowColor` exists but refused to be set over MCP. Also there: `showOnWhichMap` (Minimap / Overview Map / Both), `iconScale`, and `showObjectivePulseToInstigatorOnly`.
+- **`supply_drop_spawner_device` defaults to `spawnDelay` = "Game Start"** — set it to **"Off"** or the crate falls at the start of the round instead of when Verse calls `Spawn()`. `LandingEvent` is the right hook for "the marker has done its job".
+- 📚 **The next step up has its own file — see [09-custom-uis.md](09-custom-uis.md)** (started 20 Sep 2026): Verse-authored widgets, UMG Widget Blueprints, and how to debug them. Epic's docs: [In-Game User Interfaces in UEFN](https://dev.epicgames.com/documentation/fortnite/ingame-user-interfaces-in-unreal-editor-for-fortnite) and [User Interface Devices in UEFN](https://dev.epicgames.com/documentation/fortnite/user-interface-devices-in-unreal-editor-for-fortnite).
