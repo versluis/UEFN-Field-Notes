@@ -40,7 +40,7 @@ UEFN moves fast and findings expire. Two conventions keep the notes honest:
 1. **Every finding is stamped with the version it was observed on.** Old-version knowledge is never deleted — it remains valid *for that version*, and has repeatedly proven useful after regressions and when comparing behaviour across updates.
 2. **Every file carries a `last reviewed against` line in its front matter.** This records the most recent engine version someone has read the file against. "Proven on v41.10, reviewed against v42.10, still stands" and "proven on v41.10, never re-checked" are different claims, and the front matter is what distinguishes them. An "engine-blocked" note is a claim with an expiry date — one of this project's costliest lessons was leaving one unre-tested across an engine jump.
 
-Current engine baseline: **UEFN v42.20 / Unreal Engine 6.0** (September 2026).
+Current engine baseline: **UEFN v42.30 / Unreal Engine 6.0** (October 2026).
 
 ## Structure
 

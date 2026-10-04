@@ -1,6 +1,6 @@
 ---
-verified-on: UEFN v42.10
-last-reviewed-against: UEFN v42.10 (8 Sep 2026)
+verified-on: UEFN v42.10 – v42.30
+last-reviewed-against: UEFN v42.30 (4 Oct 2026)
 ---
 
 # LLM Personas & Conversations
@@ -588,7 +588,9 @@ Persona.GetAISession().RegisterAction(
 
 ⭐ **`barrier_device.AddToIgnoreList` unlocks per visitor**, so two people can be at different stages of the same exhibit without blocking each other — better suited to an open space than a literal door.
 
-### 🔍 Open: the persona UI shows "unavailable" from spawn
+### ✅ Answered 1 Oct 2026 — the persona UI shows "unavailable" from spawn
+
+> **Answered by Test 2 in the v42.30 section below:** the widget follows **group membership**; the button hint follows the **conversation target**. Register the channel once with the guide only, and add/remove visitors from the *group* on approach and departure. The "plain channel membership" hypothesis below was right — but the fix is `AddMember`/`RemoveMember`, not `AddChatChannel`/`RemoveChatChannel`. ✅ **Confirmed with two guides** in the applied section further down.
 
 At spawn the talk UI renders with a guide's name and the state **"unavailable"**, before the player has approached anyone. It resolves on first approach and behaves correctly thereafter.
 
@@ -598,3 +600,180 @@ At spawn the talk UI renders with a guide's name and the state **"unavailable"**
 - ❌ *`hearingRange` too generous* — reducing it from 3000 to 900 on both personas made no difference.
 
 **Remaining hypothesis: plain channel membership.** The player is added to every persona's `voice_channel` at join regardless of distance, and "unavailable" is simply the UI state for *in a persona's channel with no active conversation*. Fix to try: move `AddChatChannel` out of the join step into the proximity gate, paired with `RemoveChatChannel` on departure — with care, since asymmetric add/remove is what caused the 216-channel leak.
+
+---
+
+## ⭐ v42.30 — Epic's Conversations template, and two open questions settled (1 Oct 2026)
+
+> **Provenance and confidence.** Source: **Epic's Conversations template**, the car-dealer haggling demo released with UEFN **v42.30** (`++Fortnite+Release-42.30-CL-58557680`). The digests, the template's Verse, its Character Definition and its NPC Spawner were read over MCP. **Tests 1 and 2 were compiled and run in a live session.** The test harness was removed afterwards and Epic's `persona_behavior.verse` restored, so the template is untouched.
+
+### What changed in the API since v42.10
+
+- ⭐ **`ai_session` and `persona_component` are unchanged.** Still `ClearHistory` / `Prompt` / `RegisterAction`; still no way to pin a fact. **Nothing in v42.20 or v42.30 makes conversations easier at the API level.**
+- ✅ **The stale `MaxSize` sentence is gone.** `AddChatChannel` now reads *"Fails if the channel's agent_group already has more members than the channel type's limit"* (voice 80, text 100) and returns `result(void, add_channel_error)`; `RemoveChatChannel` mirrors it. **Confirms the 8 Sep correction** — and see [08-trusting-ai-on-uefn.md](08-trusting-ai-on-uefn.md) for what that stale sentence cost.
+- ⭐ **New on `voice_channel` in v42.20** (`MinUploadedAtFNVersion := 4220`): `IsMemberSpeaking(Agent)`, `BeginBroadcastEvent()` and `EndBroadcastEvent()` (both `listenable(agent)`), `CanBroadcastChangeEvent()`. A cleaner way to know *who* is talking than pairing `StartHearEvent` with "most recent speaker" — relevant because the `RegisterAction` callback receives no agent. **Digest-verified, not yet run.**
+- 🔍 **Persona Modifier fields missing from the v42.10 notes above:** `bOverrideBoundPersonaData` (*"author this character's voice and personality here. Leave either one blank to keep the one it ships with"*), `bOverrideCosmeticFacts` (*"If false, facts will be appended to the default ones of the NPC"*), `characterPersonaAssetBindings`, `bEnableFacialAnimations`, `attenuation`. Facts now sit in a `characterPrompt` sub-object (`PersonaPrompt`) holding `personaFacts` / `sessionFacts`. **Unknown whether these are new or were missed on v42.10.** The cosmetic-facts wording suggests some cosmetics ship with default persona facts.
+
+### How Epic's template is built
+
+- **The Character Definition is bare** — Custom type, default behaviour, **no Persona Modifier**.
+- **Everything conversational sits on the NPC Spawner:** a **Persona Modifier** added under the spawner's extra NPC Character Modifiers (base prompt ≈ 2,000 chars: buyer role, currency, seven pricing rules), and `persona_behavior` as the spawner's Behavior Script override.
+  - ⚠️ So *"the CD is where the character should be authored"* (7 Sep, above) is **one valid pattern, not the only one.** Spawner-side authoring lets one plain CD serve many personas.
+- **Per-spawn randomisation:** `OnBegin` picks one of five customer types and a budget and appends them to the base prompt with `SetPersonality`.
+- **Channel:** `agent_group` + `voice_channel` with NPC and player, `AddChatChannel` on `NPCEntity.GetSimulationEntity[]`, then `SetConversationTarget`.
+- **Two `RegisterAction` bindings with `Required := false`:** "agreed a final price" (`logic` + `int`) and "told to leave".
+- **NPC speaks first:** `PromptToTalk` with a stage direction — *"You just entered the office. Say hello to the Car Salesman…"*
+- **Consequences deferred to `StopSayEvent`:** the action callbacks only set flags; score, fade and despawn run once the NPC finishes its sentence.
+- **Fresh session per customer:** `DespawnAll` plus infinite respawn, so each customer is a new `persona_component` with a clean history.
+- **Live captions:** `CommitSayEvent` → Verse fields on a UMG widget, cleared on `StopSayEvent`.
+
+**Worth copying:** deferring consequences to `StopSayEvent`; NPC-speaks-first; fresh spawn = fresh session; captions. ⭐ **`message` is redacted in the log but renders fine in UMG** — the player can see a transcript even though you cannot log one.
+
+**Not worth copying:** `GetPlayers()[0]` throughout (single player, no late joiners — the same flaw as Epic's docs sample); no `ClearConversationTarget` in `OnEnd`; the `AddChatChannel` result and `PromptFailureEvent` ignored; `team_agent_group` declared and unused (also in the docs sample).
+
+⭐ **Moderation contrast, and it sharpens the 9 Sep rule.** The template's stage direction asks the NPC to *speak*, and passes. The out-of-band `Prompt` above asked it to *assess silently and not reply*, and was moderated 11 times in 14. **Rule: a stage direction that asks for speech passes; one that asks the model to hide something reads as injection.**
+
+### ✅⭐ Test 1 — `SetPersonality` works mid-conversation
+
+**Setup:** the personality ends with *"Your lucky number is 13."* After the greeting reaches `StopSayEvent`, `ai_session.Prompt("What is your lucky number?")` with a `{LuckyNumber:int}` struct returns **13**. `SetPersonality` then swaps that line for *"…7381. This replaces any lucky number you had before."* → `Prompt` again → **7381**. Asked out loud → **7381** in voice.
+
+- ⭐ **A personality change reaches a live session on both the `Prompt` path and the voice path, and overrides an answer already in history** — it had said 13 seconds earlier.
+- Both plainly worded `Prompt` calls returned without moderation.
+- ⚠️ **This revises "There is NO runtime fact-injection API" above.** Facts still cannot be injected, but **`SetPersonality` is a working runtime context channel.** It *is* the authored prompt, so it draws on the 10,000-char assembled ceiling: **keep the base sheet short enough to leave room for whatever gets swapped in.**
+- **Not tested:** cost or rate limits of rewriting it many times in one conversation.
+
+### ✅⭐ Test 2 — what the talk UI shows, and the "unavailable" bug
+
+Three runs. **A:** channel on the simulation entity; **B:** on the NPC entity — both with `SetConversationTarget` delayed 20 s. **C:** a simulated proximity cycle.
+
+**Where the channel is registered makes no difference.** Simulation entity and NPC entity both succeed, report identical counts and converse normally.
+
+**The talk UI has three independent layers:**
+
+| State | Widget | Button hint |
+|---|---|---|
+| Not in the NPC's channel | none | none |
+| In channel, NPC speaking | shows the NPC talking | no — press rejected (`IgnoreUntilFinished`) |
+| In channel, no conversation target | "Talk Hold" | no — press ignored |
+| In channel + target set | "Talk Hold" | **yes** — press works |
+
+- ⭐ **Channel membership shows the widget. The conversation target adds the hint and makes the button work. The interruption rule decides whether a press is accepted while the NPC speaks.**
+- ⭐ **`PromptToTalk` works before any target is set** — the NPC can greet a player who is merely in its channel.
+
+**Run C — the proximity pattern, proven.** Channel registered **once at spawn with only the NPC in the group**. Then on a timer: 15 s away → `AddMember(Player)` + `SetConversationTarget` + greeting → 40 s → `ClearConversationTarget` + `RemoveMember(Player)` → 15 s → re-add.
+
+| Phase | Group members | Channels | Observed |
+|---|---|---|---|
+| C1 away | 1 | 2 | no widget at all |
+| C2 approach | 2 | 2 | greeting; press rejected while it spoke; then a normal exchange |
+| C3 leave | 1 | 2 | widget vanished |
+| C4 return | 2 | 2 | greeted again, waiting for input |
+
+Two full cycles across two sessions; the channel count never moved. ⭐ **Group membership is the toggle, not channel registration** — which sidesteps the `AddChatChannel` churn behind the 216-channel leak entirely.
+
+⚠️ **Correction to the channel-count diagnostic (8 Sep, above).** The baseline **channel count is 2 even with the NPC alone in its group and no target set**, so the second channel is *not* added by `SetConversationTarget`. A steady 2 is still healthy and a climbing count still means a leak — only the explanation was wrong.
+
+### Revised recipe for multiple personas (supersedes the 8 Sep per-player join)
+
+1. **At persona spawn:** build `agent_group` + `voice_channel`, add **the NPC only**, `AddChatChannel` once.
+2. **On approach** (inside `TalkRadius`): `Group.AddMember(Visitor)`, `Visitor.SetConversationTarget(Persona, Channel)`, optionally `PromptToTalk` a greeting.
+3. **On departure** (beyond `ReleaseRadius`): `Visitor.ClearConversationTarget()`, `Group.RemoveMember(Visitor)`.
+4. **For local context:** `SetPersonality` with the base sheet plus a situation paragraph.
+5. **Act on `RegisterAction` verdicts in `StopSayEvent`**, not in the callback.
+6. **Show captions** from `CommitSayEvent`.
+
+❓ **Open:** does a visitor's conversation history stay in the persona's session after `RemoveMember`? And with several visitors at one persona, they share one session — fine for a guided tour, but untested.
+
+---
+
+## ✅⭐ Applied: two personas, greetings and live captions (1–4 Oct 2026)
+
+> **Provenance and confidence.** The v42.30 recipe above, applied to a two-guide museum build on UEFN v42.30 and play-tested in live sessions across two commits. Everything below was **compiled and run**; timings are measured, not estimated. Tooling traps hit along the way are in [05-editor-and-tooling.md](05-editor-and-tooling.md).
+
+### ✅ The group-membership fix holds with two personas
+
+- Visitors join a guide's group on approach and leave on departure; the guide's channel is registered once at spawn. **No widget away from both guides, the right guide's widget and hint at each, and no "unavailable" anywhere.** The two-persona question left open in Test 2 is closed.
+- ⭐ **Clear the conversation target only if it is still yours.** `ClearConversationTarget()` clears *whatever* the player targets. Guard it: `if (Current := P.GetConversationTarget[], Current(0) = Persona)`. This works because `component` is `<unique>`, so personas compare with `=`.
+- ⚠️ **Correction to the channel count, again:** `GetVoiceChannels().Length` counts **the whole island** — one baseline channel plus one per persona — whichever entity you ask. **3** with two guides; 2 in the one-NPC template. Steady = healthy; climbing = leak.
+
+### ✅ Greeting on approach, then "welcome back"
+
+- On arrival, after `SetConversationTarget`: `PromptToTalk` with *"A visitor has just walked up to you. Greet them in one or two sentences, introduce yourself, and ask what they would like to know."* A `[player]logic` map per persona switches later approaches to *"…welcome them back in one short sentence…"*. Walking between guides no longer replays introductions.
+- **Never moderated** across a dozen greetings — consistent with the rule that stage directions asking for *speech* pass.
+- The model already knows the **player's name** from session context; welcome-backs are personal with no extra work.
+- Under `IgnoreUntilFinished`, `PromptToTalk` **fails rather than queues** if the persona is mid-answer to someone else. Log it; don't retry blindly.
+
+### ⭐ Captions — how Epic does it, and what the platform allows
+
+- **`CommitSayEvent` fires exactly once per reply**, however long. There is no per-sentence event, and Verse cannot split a `message`, so **true line-by-line caption sync is impossible.**
+- **Epic's template does not page captions either** (checked in the asset and in play): its widget is an Overlay + background Image + auto-wrapping text block that **grows with the reply** (3–6 lines observed) and hides on `StopSayEvent`.
+- ⛔ **The HUD Message device is the wrong tool:** fixed-size placements cut long replies off. Replace it with a custom widget.
+- ✅ **A caption widget that works (`WB_Caption`):** Canvas → Overlay anchored bottom-centre, auto-size, rounded dark background, text wrapping at 1,000 px so the box grows taller rather than wider. Two Verse fields — `Caption` (message) and `CaptionVisible` (bool, bound to Visibility via **To Visibility (Boolean)**). One widget per visitor, added with `GetPlayerUI[P].AddWidget` on first use. Longest reply observed: 4 lines. *(Authoring traps: [09-custom-uis.md](09-custom-uis.md); MCP traps: [05-editor-and-tooling.md](05-editor-and-tooling.md).)*
+- **Hold after speech:** captions hide **2.5 s after `StopSayEvent`**, are superseded by any newer line (a per-player generation counter), and clear immediately when the visitor walks away. **Without the hold, a one-line welcome-back committed a second before the persona stopped and flashed past unread.**
+- ℹ️ **The brief one-line box on approach is Fortnite's own talk widget**, not yours (lighter tint, square corners). It appears on joining a persona's group. Nothing to fix.
+
+### 📊 Measured: think time and caption lag (2 Oct 2026, 15 replies)
+
+| Reply | Think time (prompt → voice) | Caption lag (voice → text) |
+|---|---|---|
+| Greetings / welcome back (3) | 1.5–1.6 s | **2.5–3.2 s** |
+| Short-sheet persona answers (3) | 1.8 s | **3.3–3.6 s** |
+| Long-sheet persona answers (9) | 1.8–2.1 s | **3.5–6.2 s** (avg 4.6) |
+
+Measured in Verse with `GetSimulationElapsedTime()`: prompt = `StopHearEvent` (or the greeting call), voice = `StartSayEvent`, text = `CommitSayEvent`.
+
+- **Think time is fast and flat** — the model is not the wait.
+- ⭐ **Caption lag grows with reply length.** Shortest lines lag least; the longest question produced the longest lag. **Best explanation: voice streams from the first generated sentence, while the text is released only after the whole reply is generated and moderated.** That also explains why spoken replies start so quickly. **Inferred** — reply length cannot be measured directly, because the text is redacted in the log.
+- **Nothing on your side can shorten it** — the caption is set in the frame the text arrives. Only a different API (streamed or per-sentence text) would.
+
+### ✅⭐ The speaker label closes the perceived gap
+
+On `StartSayEvent` the caption shows **"`<Name>`: ..."** immediately; on `CommitSayEvent` it becomes **"`<Name>`: `<reply>`"**. The reported effect: the caption gap stops registering as a gap at all, and switching between personas feels seamless.
+
+- Built with `Join(array{SpeakerLabel(GuideName), Said}, LabelGap())` — **`Join` works on `message`s.**
+- `GuideName` is an `@editable string` on the shared `npc_behavior`, set per Character Definition. ⭐ **Plain values are editable on a CD-hosted behaviour; only level-actor references are not** — which is exactly the asset/instance boundary in [02-npcs-and-ai.md](02-npcs-and-ai.md), seen from the permitted side.
+
+### Small things worth keeping
+
+- **Log both branches of a structured verdict.** Adding the `false` log immediately showed a persona unconvinced by a first answer and convinced by the second — and earlier showed five `true` verdicts going nowhere because **the manager device was missing from the level.** (The 9 Sep logging trap, earning its keep twice.)
+- `AddChatChannel` and `player_ui.AddWidget` are **`no_rollback`**: call them outside any `if` condition or `<decides>` function, then test the result. *(The `no_rollback` rule in [01-verse-language-and-compiler.md](01-verse-language-and-compiler.md).)*
+
+---
+
+## ✅ Scaling to six personas (4 Oct 2026)
+
+> **Provenance.** The same build on v42.30, extended over MCP and play-tested. Builds on the applied section above.
+
+### How a new persona is made — no new code
+
+- **Duplicate an existing Character Definition** (`AssetTools.duplicate`). Every copy keeps the shared Verse behaviour, so greetings, captions, proximity and the structured verdict work immediately.
+- **Fact sheet** → `CharacterModifierPersona_C_0.CharacterPrompt` → `personaFacts.factMap["LLMFactTypes:PersonalityPrompt"]`, loaded verbatim and read back to verify. Sheets ran ≈ **8,000–9,000 chars** and all sessions opened — close to the 10,000 ceiling, with the buffer the ceiling section above recommends.
+- **Voice** → `voiceModel` = `/CRD_AIPrompt/_Verse/VNI/AIPrompt.<voice>`, chosen from the **descriptor** to match each sheet's personality (Glamorous/Animated, Cinematic, Refined, Whimsical). ⭐ The descriptor table near the top of this file is the right tool for this — pick on descriptor, not on name.
+- **Nameplate text** → `CharacterModifier_UI_C_0.displayName` / `shortDescription`.
+- **Spawner** → `PID_Device_AISpawner_Character`, then `NPCCharacterDefinitionComponent.nPCCharacterDefinition`. Place personas **far enough apart that no two talk/release zones overlap** (15 m worked).
+- ⚠️ **Still editor-only:** the `@editable` `GuideName` on each CD — MCP cannot reach the behaviour instance (see [05-editor-and-tooling.md](05-editor-and-tooling.md)).
+
+### Observations
+
+- **Switching between six personas is clean — the group-membership pattern scales.**
+- One persona answered a question squarely inside its own subject with a canned *"I'm not here to talk about that."* **Bulk Response ×5 in the Prompt Editor found nothing**, so it is filed as a one-off, most likely a moderation substitution — that sheet carries the most violent wording (*shot*, *obliterated*). **Softer wording is the fix if it recurs.** Compare the benign-content moderation note above: the false-positive rate is non-zero and per-response.
+- ⚠️ **Don't identify personas by position in logs.** Tagging log lines with the NPC's X coordinate worked for two personas; a third was placed at the same X as another. **Log a name field instead.**
+
+### ⚠️ NPC nameplates are unreliable on v42.30 — despite correct settings
+
+All six Character Definitions: `displayName` set, `showNamePlate` **Always**, `showIconMinimap` **Always**. Spawners carry no overrides beyond the CD itself. Results across launches:
+
+| Run | Change | Nameplates seen |
+|---|---|---|
+| 1 | Island Settings `nameplateDisplayMode` = Default | some; gone after a push |
+| 2 | clean launch, Default | none |
+| 3 | set to **Always over MCP** (saved; file confirmed) | three of six |
+| 4 | editor restart, clean launch, still Always | none |
+| 5 | Default → Always **toggled in the editor UI**, compile + push | two of six |
+| 6 | one CD amended and **saved manually**, push | **all but one** — including a CD that was not touched |
+
+- **Not deterministic.** The same configuration gave different subsets.
+- **Edits made in the editor UI followed by a push correlate with improvement; the MCP change alone did not hold across a restart.** That is the same incomplete-MCP-write shape recorded in [05-editor-and-tooling.md](05-editor-and-tooling.md).
+- **Ruled out:** `maxTrackersOnHUD` (governs tracker devices only), spawner property overrides, distance (`bLimitNamePlateMaxDistance` false), focus (`Never`), line of sight (`AlwaysShow`).
+- **Unproven hypothesis:** an interaction with the persona / conversation UI, since every affected NPC carries a persona. **Untested with a persona-less NPC** — that is the one experiment that would settle it.
+- ⭐ **Decision: do not rely on NPC nameplates for anything players need.** Use **signs or plaques beside each persona** (name + subject) and a **`map_indicator_device`** per persona for the map ([03-devices-and-interaction.md](03-devices-and-interaction.md)). Leave Island Settings on Always so any nameplates that do appear are a bonus.

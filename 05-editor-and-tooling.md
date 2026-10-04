@@ -1,6 +1,6 @@
 ---
-verified-on: UEFN v41.10 – v42.20
-last-reviewed-against: UEFN v42.20 (20 Sep 2026)
+verified-on: UEFN v41.10 – v42.30
+last-reviewed-against: UEFN v42.30 (4 Oct 2026)
 ---
 
 # Editor & Tooling
@@ -144,3 +144,58 @@ Four toolsets aimed squarely at UMG/Verse UI work, **none of them in the August 
 - ✅ **ROTATION DERIVED 6 Sep 2026 for ENTITIES — it is 1:1, no offset.** A prefab rotated by hand *−90° about the up axis* in the editor reads back from the toolset as exactly **`yaw: -90`**; its untouched neighbour reads **`yaw: 0`**. **`yaw` (about Z) IS the editor's horizontal turn**, same number, same sign — an editor gesture and an MCP value are directly interchangeable. ⭐ **Entity transforms round-trip exactly** (send −90 → read −90), which makes entities far more predictable for programmatic placement than the device path. ⚠️ The old warning still stands for **devices**: a `button_device` placed at `0/0/0` *displayed* `180° / −90° / −180°` in its Details panel. Whether that is a device quirk or a panel-display transform is still unconfirmed — entities are the safe path either way.
 - ⭐ **Worked example — programmatic fence run (6 Sep 2026):** a fence prefab tiles seamlessly at **410 cm spacing on X with `yaw: -90`**, `SetEntityTransform` to re-space an existing run, `CreateEntity` to extend it. Six panels = 20.5 m laid in one message.
 - *(superseded)* ~~Rotation is also transformed, and the mapping is NOT yet derived. Sending `pitch/yaw/roll = 0/0/0` displayed as `180° / −90° / −180°`. Until someone works this out, sanity-check agent-set rotations in the viewport~~ — and be especially careful near hand-rolled polar-to-cartesian math, which computes in raw XYZ.
+
+---
+
+## ⛔⭐ MCP widget work, validation and pushing — traps from live agent use (1–4 Oct 2026, v42.30)
+
+> **Provenance.** All hit while building a caption widget and a manager device over the UEFN MCP toolsets, with a human in the editor alongside. Each is reproduced or confirmed in the log; the workarounds are the ones that actually worked. The project context is in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md).
+
+### ⛔⭐ Verse fields added over MCP pass locally and FAIL on the cook server
+
+`VerseFieldsToolset.AddVerseField` creates fields that the widget editor shows and the MVVM bindings use — but they are only **half-written**:
+
+1. **Verse cannot see them until UEFN restarts.** Builds fail with ``Unknown member `Caption` in `WB_Caption` `` and the assets digest lists the class with no members. Saving, recompiling the widget and `EditVerseField` changed nothing; **a restart did.**
+2. ⭐ **Even after that, the cook server fails.** The local build is clean, local validation passes and the session launches — then the game will not start: `PlatformCook: Error: VerseBuild: … Unknown member`. **The `.uasset` lacks the field description record** that editor-created fields write: `(Name="Caption",…,VisibilityAccess="<public>",WriteAccess="<public>",…)`. The editor builds its field list from memory; Epic's cook server reads the record.
+
+**Fix:** in the widget editor, click the **pencil** on each Verse field (an unexplained empty tick box disappears), then **Compile** and **Save**. The record is written.
+
+**Check before launching** — the field names appear as plain text in the file:
+
+```powershell
+$s = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes("<path>\WB_Caption.uasset")); $s.Contains('(Name="Caption"')
+```
+
+⭐ **Rule: a clean local build does not mean the cook will pass.** Cook-server Verse errors appear only as `PlatformCook: Error: VerseBuild` lines *after* the session has launched.
+
+### ⛔ The validation Fix-up removes more than it reports
+
+Deleting a HUD Message device that a Verse device's `@editable` still pointed at left: `… references a missing external actor package (AssetValidator_AssetReferenceRestrictions)`. **Run Fix-up** cleared it — and **silently removed the Verse Tag Markup component** from the same device, so tag discovery stopped finding the manager.
+
+- **Before deleting a device, clear every `@editable` that references it** (or remove the field from Verse and re-save the referencing device first).
+- ⭐ **After any Fix-up, re-check the affected device's tags and references**, not just the one it reported.
+- Read the log before accepting Fix-up: `UEFNValidation: Error` lines name exactly what will be touched.
+
+### ⚠️ Push without compile sends stale data
+
+An `@editable` was set in the Details panel and pushed **without compiling Verse** — the session ran the old value. **Compile first, then push.**
+
+### ⚠️ MCP device and asset tools — known limits
+
+- `DeviceToolset.SetDeviceProperty` **cannot assign a level device to a Verse device's `@editable` device field** (`… is not valid barrier_device`). Use the Details-panel picker.
+- `DeviceToolset.GetDeviceProperties` on such a field returns the **internal sub-object path whether or not it is set** — it cannot verify the reference. Check in the Details panel.
+- `ObjectTools.get_properties` returned `null` for `nPCBehaviorScript` on Character Definitions and spawners even though the behaviour runs — set `@editable` behaviour values in the editor.
+- `AssetTools.save_assets` returned `true` for a save that **never reached disk**. When it matters, check the file timestamp.
+- `SessionToolset.PushChanges` with `bVerseOnly := true` is refused (`The Refresh command is not currently available`); a full push works.
+
+### ⚠️ UMG over MCP — text blocks
+
+- The engine `TextBlock` is **not permitted** in UEFN, and `UEFN_TextBlock` **cannot be added** with `AddWidget` (`unsupported`).
+- ✅ **Workaround:** add a placeholder `Image`, then `ReplaceWidgetWithTemplate` with `/Game/Valkyrie/UMG/UEFN_TextBlock.UEFN_TextBlock_C`, then `RenameWidget`.
+- Follow the toolset's own rule — `list_properties` before `set_properties`. **Font is a compound struct:** read it, change `size`, write the whole struct back.
+
+### ⚠️ Island Settings changed over MCP may not take effect — toggle them in the UI (4 Oct 2026)
+
+`ObjectTools.set_properties` set `nameplateDisplayMode` to `Always` on `IslandSettings_0`; it read back correctly and the external-actor file on disk contained `EIndicatorDisplayMode::Always`. **After an editor restart it had no visible effect.** Toggling the same setting **Default → Always in the Details panel**, then compile + push, did.
+
+⭐ **Same shape as the MCP Verse-field bug above: the MCP write is real but incomplete.** For island-wide settings, make the change in the editor UI. The symptom this was chased through is in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md) — NPC nameplates on v42.30.

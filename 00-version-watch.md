@@ -1,6 +1,6 @@
 ---
-verified-on: UEFN v41.10 – v42.20
-last-reviewed-against: UEFN v42.20 (19 Sep 2026)
+verified-on: UEFN v41.10 – v42.30
+last-reviewed-against: UEFN v42.30 (1 Oct 2026)
 ---
 
 # Version watch
@@ -11,6 +11,7 @@ Dated version notices and per-update reviews. Read new release notes against eve
 
 > ⚠️ **VERSION NOTICE (3 Sep 2026): v42.00 → v42.10.** Release notes: [42.10 Fortnite Ecosystem Updates and Release Notes](https://dev.epicgames.com/documentation/fortnite/42-10-fortnite-ecosystem-updates-and-release-notes)
 > ⚠️ **VERSION NOTICE (19 Sep 2026): v42.10 → v42.20.** Release notes: [42.20 Fortnite Ecosystem Updates and Release Notes](https://dev.epicgames.com/documentation/fortnite/42-20-fortnite-ecosystem-updates-and-release-notes)
+> ⚠️ **VERSION NOTICE (1 Oct 2026): v42.20 → v42.30.** Release notes: [42.30 Fortnite Ecosystem Updates and Release Notes](https://dev.epicgames.com/documentation/fortnite/42-30-fortnite-ecosystem-updates-and-release-notes) · [v42.30 Known Issues and Pre-Release Updates](https://forums.unrealengine.com/t/v42-30-known-issues-and-pre-release-updates/2835388)
 > 📚 **For any future update, start here:** [What's New in Unreal Editor for Fortnite](https://dev.epicgames.com/documentation/fortnite/whats-new-in-unreal-editor-for-fortnite) — the running index. Entries go to **forum posts first**, and the deeper documentation is linked from inside those posts.
 
 **v42.10 reviewed against the field notes 3 Sep 2026.** ✅ **Nothing changed for us in:** `GetPlayAnimationController`, `FindCreativeObjectsWithTag`, `button_device`, `npc_behavior`, `tracker_device`, `map_indicator_device` — the entries stand. ✅ **No revision control changes at all** — no LORE/URC/branch/merge mentions, so the branch findings carry over. ✅ **Scene Graph got only** a looping-skeletal-animation fix and `EaseOut` re-exposed as experimental — **`mesh_component` is still `epic_internal`**, so the Scene Graph interactable blocker is unchanged. Five items *do* touch active work:
@@ -29,6 +30,23 @@ Dated version notices and per-update reviews. Read new release notes against eve
 - 🔍 **Scene Graph:** `SetPresentableToPlayers` now works on named prefab entities even when the prefab is spawned dynamically at runtime; a component-type-query bug after repeated add/remove component calls is fixed; dynamically-spawned prefab children now only sync to a client once relevant, rather than immediately. **No mention of `mesh_component` losing its `epic_internal` status**, so that blocker is probably still standing.
 - ℹ️ **Marketplace APIs renamed.** `entitlement` and the rest of the Marketplace Verse API moved from `/Fortnite.com/Marketplace` to `/UnrealEngine.com/Marketplace`. Old imports still work as aliases (deprecation warning only) — no action needed unless starting something new.
 - 🔍 **Channel API (new).** Verse can now create and manage custom voice/text chat channels — who can hear whom, and when. Potentially a mechanic lever rather than just a QoL item; flagged as a maybe, not urgent. *(Note the overlap with the hand-rolled `voice_channel` work in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md) — worth checking whether this supersedes any of it.)*
+
+**v42.30 reviewed against the field notes 1 Oct 2026.** Fourteen items touch these notes:
+
+- ⭐ **Conversations template shipped.** A playable introduction to the LLM conversations feature — a used-car-salesperson negotiation demo covering prompt crafting, randomised characters, and Verse + structured output driving gameplay outcomes. **This is essentially the whole stack in [02a-llm-personas-and-conversations.md](02a-llm-personas-and-conversations.md) as an official template**; it is in the Project Browser, and reading it settled two open questions — see that file's v42.30 section.
+- ⛔ **Ability Templates: breaking Verse changes.** `fort_template_ability` is **no longer a parametric class** — specialisation is now `my_ability := class(fort_template_ability):`. Targeting queries are now an **array of `fort_target_affiliation`** (Any removed, **Neutral** added). `fort_ability_animation_element_span` now takes **AnimationSequence** (not Animation) and a `play_animation_layer` enum (not `fort_ability_anim_layer`) — re-select animations in any animation_element. **Code using any of these will not compile until updated.** Also new: `fort_ability_status_effect_removal_point`, plus `fort_ability_attribute_modifier_point`/`_span` (Add/Multiply/Override MaxHealth, MaxShield, Speed, Gravity).
+- ⚠️ **Scene Graph: client-side `OnReceive` now ignored.** Any setup where `OnReceive` could fire on the client (previously likely to crash) is now **ignored with a log message** — rework anything relying on client-based `OnReceive`. The same release fixes dispatching of Verse-based scene events on clients.
+- ⚠️ **Marketplace namespace follow-up to the v42.20 rename.** Code with `using {/UnrealEngine.com}` **and** a locally defined `Marketplace` symbol now conflicts. Fix: remove the using, or rename/qualify the local symbol. Aliases keep plain old imports working otherwise.
+- 🔍 **Verse Skeletal Animation: don't build on it.** Stays Experimental; Epic is developing a **replacement API** and will not fix bugs or improve the current one, which will eventually be deprecated. Anything built on it now will need rework.
+- ✅ **Memory thermometer changes coming.** The publish memory calculation moves into the profiling tools and runs automatically on every cook; over-threshold shows in the Game Performance report with a **per-asset memory digest**. Reporting switches to real units — the 100,000-unit limit displays as **300 MB** (same budget). The in-session thermometer will be removed in a future release. *(The private-version memory-calculation flow is in [05-editor-and-tooling.md](05-editor-and-tooling.md).)*
+- ✅ **In-editor Content Pre-Checks.** Potential moderation violations now flag inside the editor as you build (notifications, Content Browser warning icons, Moderation Message Log). **Informational only** — they do not block building or publishing, and publish moderation is unchanged. The same submit-and-see signal, just earlier. *(Compare the validation-is-a-report finding in [07-imports-and-validation.md](07-imports-and-validation.md).)*
+- ✅ **UEFN MCP:** Verse event fields can now bind to UMG Widgets, and dialogue popups no longer stall MCP progress waiting for user input.
+- ✅ **Verse fixes:** equipping an item via Verse no longer breaks the player's aim/shoot; `RemoveItemEvent`'s `RemovedAmount` is no longer always zero; `<localizes>` loading optimised — 2000+ attributes in one module previously hung island load.
+- 🔶 **Held items (new).** `held_item_template` — a ready-to-customise entity prefab for carryable non-weapon items (ships as a torch); reskin into lanterns, tools, banners.
+- ℹ️ **Verse paths now shown consistently across the editor** (Content Browser, source-control dialogs, validation errors, Reference Viewer, tooltips, copied references; new Copy Verse Path context-menu options). **New projects only** — existing projects unaffected.
+- ℹ️ **UEFN source assets on Fab.** Complete, editable Verse/Scene Graph systems can be sold on Fab; publishing opens **15 Oct 2026**, creators keep 88% of net revenue.
+- ⚠️ **Known issue (fix targeted v43.10, 12 Nov).** Partying with a player who is not on a private island's team and joining by code shows the *owner* a misleading *"You don't have permission to play this content"* error — it is actually the party member lacking access. Relevant to console-joined private playtests ([05-editor-and-tooling.md](05-editor-and-tooling.md)).
+- ✅ **Community fixes landed:** proximity voice chat (broken since v40.20), consumables removed from inventory on respawn, mobile players moving while all input was consumed, and Rocket Launcher / Shockwave Grenade impulse applying correctly on physics-enabled islands.
 
 ## 📡 Epic roadmap watch — annotations (5 Sep 2026)
 
